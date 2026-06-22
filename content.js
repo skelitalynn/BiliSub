@@ -406,7 +406,10 @@
     if (panelEl) return;
     const style = document.createElement('style');
     style.textContent = `
-      .bilisub-panel{position:fixed;top:80px;right:16px;z-index:99999;width:320px;min-width:280px;min-height:200px;max-width:600px;max-height:80vh;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.15);font-family:system-ui,sans-serif;overflow:auto;resize:both;animation:bilisub-fadeIn .25s ease;border:1px solid #e0e0e0}
+      .bilisub-panel{position:fixed;top:80px;right:16px;z-index:99999;width:320px;min-width:280px;max-width:600px;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.15);font-family:system-ui,sans-serif;animation:bilisub-fadeIn .25s ease;border:1px solid #e0e0e0;overflow:hidden}
+      .bilisub-panel-body{max-height:80vh;overflow-y:auto}
+      .bilisub-panel-resize-left{position:absolute;left:0;top:0;bottom:0;width:6px;cursor:ew-resize;z-index:2;transition:background .15s}
+      .bilisub-panel-resize-left:hover,.bilisub-panel-resize-left:active{background:rgba(0,161,214,.2)}
       .bilisub-panel-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px;position:sticky;top:0;background:#fff;z-index:1}
       .bilisub-panel-logo{font-size:16px;font-weight:700;color:#00a1d6}.bilisub-panel-logo span{color:#ff6699}
       .bilisub-panel-close{background:none;border:none;color:#999;font-size:18px;cursor:pointer;padding:0 4px;line-height:1}.bilisub-panel-close:hover{color:#333}
@@ -431,8 +434,23 @@
 
     panelEl = document.createElement('div');
     panelEl.className = 'bilisub-panel';
-    panelEl.innerHTML = `<div class="bilisub-panel-header"><div class="bilisub-panel-logo">Bili<span>Sub</span></div><button class="bilisub-panel-close" title="关闭">✕</button></div><div class="bilisub-panel-tag" style="background:${bgs[info.type]};color:${colors[info.type]}">${info.label}</div><div class="bilisub-panel-list-wrap"><div class="bilisub-panel-list"></div></div><div class="bilisub-panel-btns"></div><div class="bilisub-panel-log"></div>`;
+    panelEl.innerHTML = `<div class="bilisub-panel-resize-left"></div><div class="bilisub-panel-body"><div class="bilisub-panel-header"><div class="bilisub-panel-logo">Bili<span>Sub</span></div><button class="bilisub-panel-close" title="关闭">✕</button></div><div class="bilisub-panel-tag" style="background:${bgs[info.type]};color:${colors[info.type]}">${info.label}</div><div class="bilisub-panel-list-wrap"><div class="bilisub-panel-list"></div></div><div class="bilisub-panel-btns"></div><div class="bilisub-panel-log"></div></div>`;
     document.body.appendChild(panelEl);
+
+    // Left-edge drag resize
+    const handle = panelEl.querySelector('.bilisub-panel-resize-left');
+    let dragging = false, startX, startW;
+    handle.addEventListener('mousedown', (e) => {
+      dragging = true; startX = e.clientX; startW = panelEl.offsetWidth;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const delta = startX - e.clientX;
+      const newW = Math.min(600, Math.max(280, startW + delta));
+      panelEl.style.width = newW + 'px';
+    });
+    document.addEventListener('mouseup', () => { dragging = false; });
 
     panelLog = panelEl.querySelector('.bilisub-panel-log');
     panelEl.querySelector('.bilisub-panel-close').onclick = hidePanel;
