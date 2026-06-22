@@ -125,7 +125,7 @@ async function downloadVideo(bvid, allPages = false) {
   }
 }
 
-// Download batch (collection/fav/space)
+// Download batch (collection/fav/space) → single ZIP
 async function downloadBatch(info) {
   const btn = document.getElementById('btn-download');
   btn.disabled = true;
@@ -141,26 +141,19 @@ async function downloadBatch(info) {
     if (!resp.videos?.length) { log('未找到视频', 'fail'); btn.disabled = false; return; }
 
     const total = resp.videos.length;
-    log(`共 ${total} 个视频，开始提取...`, 'ok');
-    let ok = 0, fail = 0;
+    const bvids = resp.videos.map(v => v.bvid);
+    log(`共 ${total} 个视频，打包中...`, 'ok');
 
-    for (let i = 0; i < total; i++) {
-      const v = resp.videos[i];
-      btn.innerHTML = `<span class="spinner"></span> ${i+1}/${total}`;
-      try {
-        const r = await send({ action: 'extract', bvid: v.bvid });
-        if (r.error) { fail++; log(`✗ [${i+1}] ${v.bvid} ${r.error}`, 'fail'); }
-        else {
-          downloadFile(r.json, `BiliSub_${v.bvid}.json`);
-          downloadFile(r.txt, `BiliSub_${v.bvid}.txt`);
-          ok++;
-          log(`✓ [${i+1}/${total}] ${v.title?.substring(0,20)} · ${r.count}条`, 'ok');
-        }
-      } catch (e) { fail++; log(`✗ [${i+1}] ${e.message}`, 'fail'); }
-      await new Promise(r => setTimeout(r, 50));
+    btn.innerHTML = `<span class="spinner"></span> 正在下载 ${total} 个视频字幕...`;
+
+    const result = await send({ action: 'extractBatch', bvids });
+
+    for (const v of resp.videos) {
+      const err = result.errors?.find(e => e.bvid === v.bvid);
+      if (err) log(`✗ ${v.bvid} ${err.error}`, 'fail');
     }
 
-    log(`完成 ${ok}/${total}${fail?' (失败'+fail+')':''}`, fail ? 'fail' : 'ok');
+    log(`✓ ZIP 已下载 · ${result.ok}/${total} 成功${result.fail?' · '+result.fail+'失败':''}`, result.fail ? 'fail' : 'ok');
   } catch (e) {
     log(`✗ ${e.message}`, 'fail');
   } finally {

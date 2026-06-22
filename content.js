@@ -153,7 +153,6 @@
         switch (msg.action) {
           case 'extract': {
             if (msg.allPages) {
-              // Multi-page video
               const view = await (await fetch(
                 `https://api.bilibili.com/x/web-interface/view?bvid=${msg.bvid}`,
                 { credentials: 'include' }
@@ -174,6 +173,36 @@
               const r = await extractSubtitle(msg.bvid, msg.cid);
               sendResponse(r);
             }
+            break;
+          }
+          case 'extractBatch': {
+            // Process multiple BVs and return a ZIP data URL
+            const { bvids } = msg;
+            const zip = new JSZip();
+            let ok = 0, fail = 0;
+            const errors = [];
+
+            for (let i = 0; i < bvids.length; i++) {
+              try {
+                const r = await extractSubtitle(bvids[i]);
+                zip.file(`${bvids[i]}.json`, r.json);
+                if (r.txt) zip.file(`${bvids[i]}.txt`, r.txt);
+                ok++;
+              } catch (e) {
+                fail++;
+                errors.push({ bvid: bvids[i], error: e.message });
+              }
+            }
+
+            const blob = await zip.generateAsync({ type: 'blob' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `BiliSub_${bvids.length}videos.zip`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            sendResponse({ ok, fail, total: bvids.length, errors });
             break;
           }
           case 'list': {

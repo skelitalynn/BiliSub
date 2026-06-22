@@ -22,7 +22,7 @@
         "https://space.bilibili.com/*",
         "https://*.bilibili.com/*favlist*"
       ],
-      "js": ["content.js"],
+      "js": ["jszip.min.js", "content.js"],
       "css": ["content.css"],
       "run_at": "document_end"
     }
