@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>BiliSub</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{padding:16px;font-family:system-ui,sans-serif;font-size:13px;background:#1a1a2e;color:#e0e0e0}
+  .logo{font-size:20px;font-weight:700;margin-bottom:4px;color:#00a1d6}
+  .logo span{color:#ff6699}
+  .page-type{padding:6px 10px;border-radius:6px;font-size:11px;margin:10px 0;display:inline-block}
+  .type-video{background:#0d3320;color:#4caf50}
+  .type-collection{background:#331a0d;color:#ff9800}
+  .type-space{background:#0d1a33;color:#2196f3}
+  .type-fav{background:#330d2e;color:#e91e63}
+  .type-playlist{background:#0d332e;color:#00bcd4}
+  .type-unknown{background:#222;color:#888}
+  .btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;margin:6px 0;border:none;border-radius:8px;font-size:13px;cursor:pointer;transition:all .2s}
+  .btn-primary{background:#00a1d6;color:#fff}
+  .btn-primary:hover{background:#00b5e5}
+  .btn-batch{background:#ff6699;color:#fff}
+  .btn-batch:hover{background:#ff7aa8}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:s .8s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .log{margin-top:10px;max-height:300px;overflow-y:auto;font-size:11px;color:#888;line-height:1.8}
+  .log .ok{color:#4caf50}
+  .log .fail{color:#f44336}
+  .divider{border:none;border-top:1px solid #333;margin:10px 0}
+</style>
+</head>
+<body>
+<div class="logo">Bili<span>Sub</span></div>
+<div id="typeTag" class="page-type type-unknown">检测中...</div>
+<div id="buttons"></div>
+<div class="divider"></div>
+<div id="log" class="log"></div>
+<script src="sidepanel.js"></script>
+</body>
+</html>

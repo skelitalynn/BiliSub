@@ -1,18 +1,22 @@
 {
   "manifest_version": 3,
   "name": "BiliSub",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "一键下载 Bilibili 视频 AI 字幕（TXT），支持视频/合集/收藏夹/个人主页/选集",
   "permissions": [
     "downloads",
     "storage",
-    "tabs"
+    "tabs",
+    "sidePanel"
   ],
   "host_permissions": [
     "https://api.bilibili.com/*",
     "https://aisubtitle.hdslb.com/*",
     "https://subtitle.bilibili.com/*"
   ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
   "content_scripts": [
     {
       "matches": [
@@ -31,7 +35,6 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_popup": "popup.html",
     "default_title": "BiliSub - 字幕下载",
     "default_icon": {
       "16": "icons/icon16.png",
