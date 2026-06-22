@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>BiliSub</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { width: 260px; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; background: #1a1a2e; color: #e0e0e0; }
+    .logo { font-size: 20px; font-weight: 700; margin-bottom: 12px; color: #00a1d6; }
+    .logo span { color: #ff6699; }
+    .info { font-size: 12px; color: #888; line-height: 1.6; }
+    .info a { color: #00a1d6; }
+    .divider { border: none; border-top: 1px solid #333; margin: 12px 0; }
+    .status { padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 10px; }
+    .status-ok { background: #0d3320; color: #4caf50; }
+    .status-tip { background: #1a1a2e; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="logo">Bili<span>Sub</span></div>
+  <div id="status" class="status status-tip">检测中...</div>
+  <hr class="divider">
+  <div class="info">
+    <strong>视频页</strong>：播放器右下角出现「⬇ AI字幕」按钮<br><br>
+    <strong>合集页</strong>：标题旁出现「⬇ 批量下载字幕」按钮<br><br>
+    点击即下载 JSON + TXT 双格式
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
