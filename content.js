@@ -251,7 +251,7 @@
   function plog(msg, cls) {
     if (!panelLog) return;
     const el = document.createElement('div');
-    el.style.cssText = `color:${cls==='ok'?'#4caf50':cls==='fail'?'#f44336':'#aaa'};font-size:11px;line-height:1.8`;
+    el.style.cssText = `color:${cls==='ok'?'#2e7d32':cls==='fail'?'#c62828':'#666'};font-size:11px;line-height:1.8`;
     el.textContent = msg;
     panelLog.appendChild(el);
     panelLog.scrollTop = panelLog.scrollHeight;
@@ -327,17 +327,17 @@
     listEl.innerHTML = '';
 
     if (panelVideoList.length === 0) {
-      listEl.innerHTML = '<div style="color:#888;font-size:12px;text-align:center;padding:20px">列表为空</div>';
+      listEl.innerHTML = '<div style="color:#999;font-size:12px;text-align:center;padding:20px">列表为空</div>';
       return;
     }
 
     for (let i = 0; i < panelVideoList.length; i++) {
       const v = panelVideoList[i];
       const item = document.createElement('div');
-      item.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid #2a2a3e;font-size:12px';
+      item.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid #eee;font-size:12px';
       item.innerHTML = `
-        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ccc" title="${v.title.replace(/"/g,'&quot;')}">${v.title}</span>
-        <button class="bilisub-remove-btn" style="background:none;border:none;color:#f44336;cursor:pointer;font-size:14px;padding:2px 6px;flex-shrink:0" title="移出队列">✕</button>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#333" title="${v.title.replace(/"/g,'&quot;')}">${v.title}</span>
+        <button class="bilisub-remove-btn" style="background:none;border:none;color:#e53935;cursor:pointer;font-size:14px;padding:2px 6px;flex-shrink:0" title="移出队列">✕</button>
       `;
       item.querySelector('.bilisub-remove-btn').onclick = () => removeFromQueue(i);
       listEl.appendChild(item);
@@ -398,7 +398,7 @@
     } else if (['collection', 'fav', 'space'].includes(info.type)) {
       fetchAndShowVideoList(info);
     } else {
-      btns.innerHTML = '<div style="color:#888;font-size:12px;padding:8px">请在视频/合集/收藏夹/主页使用</div>';
+      btns.innerHTML = '<div style="color:#999;font-size:12px;padding:8px;text-align:center">请在视频/合集/收藏夹/主页使用</div>';
     }
   }
 
@@ -406,30 +406,32 @@
     if (panelEl) return;
     const style = document.createElement('style');
     style.textContent = `
-      .bilisub-panel{position:fixed;top:80px;right:16px;z-index:99999;width:300px;background:#1a1a2e;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);font-family:system-ui,sans-serif;overflow:hidden;animation:bilisub-fadeIn .25s ease}
-      .bilisub-panel-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px}
+      .bilisub-panel{position:fixed;top:80px;right:16px;z-index:99999;width:320px;min-width:280px;min-height:200px;max-width:600px;max-height:80vh;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.15);font-family:system-ui,sans-serif;overflow:auto;resize:both;animation:bilisub-fadeIn .25s ease;border:1px solid #e0e0e0}
+      .bilisub-panel-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px;position:sticky;top:0;background:#fff;z-index:1}
       .bilisub-panel-logo{font-size:16px;font-weight:700;color:#00a1d6}.bilisub-panel-logo span{color:#ff6699}
-      .bilisub-panel-close{background:none;border:none;color:#888;font-size:18px;cursor:pointer;padding:0 4px;line-height:1}.bilisub-panel-close:hover{color:#fff}
+      .bilisub-panel-close{background:none;border:none;color:#999;font-size:18px;cursor:pointer;padding:0 4px;line-height:1}.bilisub-panel-close:hover{color:#333}
       .bilisub-panel-tag{display:inline-block;padding:3px 8px;border-radius:4px;font-size:11px;margin:0 14px 4px}
+      .bilisub-panel-list-wrap{display:none;margin:0 14px}
+      .bilisub-panel-list{max-height:260px;overflow-y:auto;border:1px solid #e8e8e8;border-radius:6px}
       .bilisub-panel-btns{padding:8px 14px;display:flex;flex-direction:column;gap:6px}
-      .bilisub-panel-btn{display:flex;align-items:center;justify-content:center;width:100%;padding:9px;border:none;border-radius:7px;font-size:12px;cursor:pointer;transition:all .2s}
+      .bilisub-panel-btn{display:flex;align-items:center;justify-content:center;width:100%;padding:9px;border:none;border-radius:7px;font-size:12px;cursor:pointer;transition:all .2s;font-weight:500}
       .bilisub-panel-primary{background:#00a1d6;color:#fff}.bilisub-panel-primary:hover{background:#00b5e5}
       .bilisub-panel-batch{background:#ff6699;color:#fff}.bilisub-panel-batch:hover{background:#ff7aa8}
-      .bilisub-panel-btn:disabled{opacity:.5;cursor:not-allowed}
+      .bilisub-panel-btn:disabled{opacity:.4;cursor:not-allowed}
       .bilisub-panel-log{max-height:180px;overflow-y:auto;padding:4px 14px 10px}
-      .bilisub-spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:bilisub-s .8s linear infinite}
+      .bilisub-spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(0,0,0,.15);border-top-color:#00a1d6;border-radius:50%;animation:bilisub-s .8s linear infinite}
       @keyframes bilisub-s{to{transform:rotate(360deg)}}
       @keyframes bilisub-fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
     `;
     document.head.appendChild(style);
 
     const info = detectPageType();
-    const colors = { video: '#4caf50', collection: '#ff9800', fav: '#e91e63', space: '#2196f3', unknown: '#888' };
-    const bgs = { video: '#0d3320', collection: '#331a0d', fav: '#330d2e', space: '#0d1a33', unknown: '#222' };
+    const colors = { video: '#2e7d32', collection: '#e65100', fav: '#c62828', space: '#1565c0', unknown: '#666' };
+    const bgs = { video: '#e8f5e9', collection: '#fff3e0', fav: '#fce4ec', space: '#e3f2fd', unknown: '#f5f5f5' };
 
     panelEl = document.createElement('div');
     panelEl.className = 'bilisub-panel';
-    panelEl.innerHTML = `<div class="bilisub-panel-header"><div class="bilisub-panel-logo">Bili<span>Sub</span></div><button class="bilisub-panel-close" title="关闭">✕</button></div><div class="bilisub-panel-tag" style="background:${bgs[info.type]};color:${colors[info.type]}">${info.label}</div><div class="bilisub-panel-list-wrap" style="display:none"><div class="bilisub-panel-list" style="max-height:260px;overflow-y:auto;margin:0 14px"></div></div><div class="bilisub-panel-btns"></div><div class="bilisub-panel-log"></div>`;
+    panelEl.innerHTML = `<div class="bilisub-panel-header"><div class="bilisub-panel-logo">Bili<span>Sub</span></div><button class="bilisub-panel-close" title="关闭">✕</button></div><div class="bilisub-panel-tag" style="background:${bgs[info.type]};color:${colors[info.type]}">${info.label}</div><div class="bilisub-panel-list-wrap"><div class="bilisub-panel-list"></div></div><div class="bilisub-panel-btns"></div><div class="bilisub-panel-log"></div>`;
     document.body.appendChild(panelEl);
 
     panelLog = panelEl.querySelector('.bilisub-panel-log');
