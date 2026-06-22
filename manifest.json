@@ -6,7 +6,9 @@
   "permissions": [
     "downloads",
     "storage",
-    "tabs"
+    "tabs",
+    "sidePanel",
+    "scripting"
   ],
   "host_permissions": [
     "https://api.bilibili.com/*",
