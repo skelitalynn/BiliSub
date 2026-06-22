@@ -61,6 +61,11 @@
     return sorted;
   }
 
+  // ═══ Utils ═══
+  function sanitizeFilename(title) {
+    return title.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim().substring(0, 80);
+  }
+
   // ═══ Core: Extract subtitle for a single BV ═══
   async function extractSubtitle(bvid, cidOverride) {
     const view = await (await fetch(`https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`, { credentials: 'include' })).json();
@@ -92,7 +97,8 @@
       json: JSON.stringify(sub, null, 2),
       txt,
       count: body.length,
-      title
+      title,
+      filename: sanitizeFilename(title)
     };
   }
 
@@ -176,7 +182,6 @@
             break;
           }
           case 'extractBatch': {
-            // Process multiple BVs and return a ZIP data URL
             const { bvids } = msg;
             const zip = new JSZip();
             let ok = 0, fail = 0;
@@ -185,8 +190,7 @@
             for (let i = 0; i < bvids.length; i++) {
               try {
                 const r = await extractSubtitle(bvids[i]);
-                zip.file(`${bvids[i]}.json`, r.json);
-                if (r.txt) zip.file(`${bvids[i]}.txt`, r.txt);
+                if (r.txt) zip.file(`${r.filename}.txt`, r.txt);
                 ok++;
               } catch (e) {
                 fail++;

@@ -107,14 +107,13 @@ async function downloadVideo(bvid, allPages = false) {
       for (const p of resp.pages) {
         if (p.error) { log(`✗ P${p.page} ${p.error}`, 'fail'); }
         else {
-          downloadFile(p.json, `BiliSub_${bvid}_P${p.page}.json`);
-          downloadFile(p.txt, `BiliSub_${bvid}_P${p.page}.txt`);
+          const name = p.part ? sanitize(p.part) : `P${p.page}`;
+          downloadFile(p.txt, `${name}.txt`);
           log(`✓ P${p.page} · ${p.count}条 · ${p.part}`, 'ok');
         }
       }
     } else {
-      downloadFile(resp.json, `BiliSub_${bvid}.json`);
-      downloadFile(resp.txt, `BiliSub_${bvid}.txt`);
+      downloadFile(resp.txt, `${resp.filename || resp.bvid}.txt`);
       log(`✓ ${resp.title?.substring(0,30)} · ${resp.count}条`, 'ok');
     }
   } catch (e) {
@@ -167,6 +166,10 @@ function downloadFile(content, filename) {
   a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
   a.download = filename;
   a.click();
+}
+
+function sanitize(s) {
+  return s.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim().substring(0, 80);
 }
 
 // Init
