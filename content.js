@@ -233,7 +233,7 @@
   });
 
   // ═══ Floating Panel UI ═══
-  let panelVisible = false, panelEl = null, panelLog = null, panelBtn = null;
+  let panelVisible = false, panelEl = null, panelLog = null, panelBtn = null, panelVideoList = [];
 
   function detectPageType() {
     const url = location.href;
@@ -282,20 +282,12 @@
     panelBtn.disabled = false; panelBtn.innerHTML = '⬇ 下载 AI 字幕';
   }
 
-  async function panelDownloadBatch(info) {
+  async function panelDownloadBatch(videos) {
     panelBtn.disabled = true; panelLog.innerHTML = '';
     try {
-      plog('获取列表中...', '');
-      let videos;
-      if (info.type === 'collection') videos = await listCollection(info.listId);
-      else if (info.type === 'fav') videos = await listFavorites(info.fid);
-      else if (info.type === 'space') videos = await listSpace(info.mid, 50);
-      else { plog('不支持', 'fail'); panelBtn.disabled = false; return; }
-      if (!videos?.length) { plog('无视频', 'fail'); panelBtn.disabled = false; return; }
-
       const total = videos.length;
       plog(`共 ${total} 个视频，打包 ZIP...`, 'ok');
-      panelBtn.innerHTML = `<span class="bilisub-spin"></span> ${total}个视频...`;
+      panelBtn.innerHTML = `<span class="bilisub-spin"></span> ${total}个...`;
 
       const zip = new JSZip();
       let ok = 0;
@@ -306,19 +298,97 @@
           ok++;
         } catch (e) { plog(`✗ ${v.bvid} ${e.message}`, 'fail'); }
       }
-
       const blob = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = `BiliSub_${total}videos.zip`; a.click();
       URL.revokeObjectURL(url);
       plog(`✓ ZIP · ${ok}/${total}`, 'ok');
     } catch (e) { plog(e.message, 'fail'); }
-    panelBtn.disabled = false; panelBtn.innerHTML = '⬇ 批量下载字幕';
+    panelBtn.disabled = false;
+    updateDownloadBtnState();
+  }
+
+  function updateDownloadBtnState() {
+    if (!panelBtn) return;
+    const count = panelVideoList.length;
+    panelBtn.innerHTML = `⬇ 批量下载字幕 (${count}个 ZIP)`;
+    panelBtn.disabled = count === 0;
+  }
+
+  function removeFromQueue(index) {
+    panelVideoList.splice(index, 1);
+    renderVideoList();
+    updateDownloadBtnState();
+  }
+
+  function renderVideoList() {
+    const listEl = panelEl.querySelector('.bilisub-panel-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    if (panelVideoList.length === 0) {
+      listEl.innerHTML = '<div style="color:#888;font-size:12px;text-align:center;padding:20px">列表为空</div>';
+      return;
+    }
+
+    for (let i = 0; i < panelVideoList.length; i++) {
+      const v = panelVideoList[i];
+      const item = document.createElement('div');
+      item.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid #2a2a3e;font-size:12px';
+      item.innerHTML = `
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ccc" title="${v.title.replace(/"/g,'&quot;')}">${v.title}</span>
+        <button class="bilisub-remove-btn" style="background:none;border:none;color:#f44336;cursor:pointer;font-size:14px;padding:2px 6px;flex-shrink:0" title="移出队列">✕</button>
+      `;
+      item.querySelector('.bilisub-remove-btn').onclick = () => removeFromQueue(i);
+      listEl.appendChild(item);
+    }
+  }
+
+  async function fetchAndShowVideoList(info) {
+    const btns = panelEl.querySelector('.bilisub-panel-btns');
+    const listContainer = panelEl.querySelector('.bilisub-panel-list-wrap');
+    btns.innerHTML = '<div class="bilisub-spin" style="margin:10px auto"></div>';
+    listContainer.style.display = 'none';
+
+    panelLog.innerHTML = '';
+    plog('加载视频列表中...', '');
+
+    try {
+      let videos;
+      if (info.type === 'collection') videos = await listCollection(info.listId);
+      else if (info.type === 'fav') videos = await listFavorites(info.fid);
+      else if (info.type === 'space') videos = await listSpace(info.mid, 50);
+      else { plog('不支持', 'fail'); return; }
+
+      if (!videos?.length) { plog('未找到视频', 'fail'); btns.innerHTML = ''; return; }
+
+      panelVideoList = videos;
+      plog(`共 ${videos.length} 个视频，可移除不需要的`, 'ok');
+      listContainer.style.display = 'block';
+
+      // Build download button
+      btns.innerHTML = '';
+      const b = document.createElement('button');
+      b.className = 'bilisub-panel-btn bilisub-panel-batch';
+      b.onclick = () => panelDownloadBatch(panelVideoList);
+      btns.appendChild(b);
+      panelBtn = b;
+      updateDownloadBtnState();
+
+      renderVideoList();
+    } catch (e) {
+      plog(e.message, 'fail');
+      btns.innerHTML = '';
+    }
   }
 
   function buildPanelButtons(info) {
     const btns = panelEl.querySelector('.bilisub-panel-btns');
+    const listWrap = panelEl.querySelector('.bilisub-panel-list-wrap');
     btns.innerHTML = '';
+    if (listWrap) listWrap.style.display = 'none';
+    panelVideoList = [];
+
     const mkBtn = (text, cls, fn) => {
       const b = document.createElement('button'); b.className = 'bilisub-panel-btn ' + cls; b.textContent = text; b.onclick = fn; btns.appendChild(b); return b;
     };
@@ -326,7 +396,7 @@
       panelBtn = mkBtn('⬇ 下载当前视频字幕', 'bilisub-panel-primary', () => panelDownloadSingle(info.bvid, false));
       mkBtn('⬇ 下载全部选集字幕', 'bilisub-panel-batch', () => panelDownloadSingle(info.bvid, true));
     } else if (['collection', 'fav', 'space'].includes(info.type)) {
-      panelBtn = mkBtn('⬇ 批量下载字幕 (ZIP)', 'bilisub-panel-batch', () => panelDownloadBatch(info));
+      fetchAndShowVideoList(info);
     } else {
       btns.innerHTML = '<div style="color:#888;font-size:12px;padding:8px">请在视频/合集/收藏夹/主页使用</div>';
     }
@@ -359,7 +429,7 @@
 
     panelEl = document.createElement('div');
     panelEl.className = 'bilisub-panel';
-    panelEl.innerHTML = `<div class="bilisub-panel-header"><div class="bilisub-panel-logo">Bili<span>Sub</span></div><button class="bilisub-panel-close" title="关闭">✕</button></div><div class="bilisub-panel-tag" style="background:${bgs[info.type]};color:${colors[info.type]}">${info.label}</div><div class="bilisub-panel-btns"></div><div class="bilisub-panel-log"></div>`;
+    panelEl.innerHTML = `<div class="bilisub-panel-header"><div class="bilisub-panel-logo">Bili<span>Sub</span></div><button class="bilisub-panel-close" title="关闭">✕</button></div><div class="bilisub-panel-tag" style="background:${bgs[info.type]};color:${colors[info.type]}">${info.label}</div><div class="bilisub-panel-list-wrap" style="display:none"><div class="bilisub-panel-list" style="max-height:260px;overflow-y:auto;margin:0 14px"></div></div><div class="bilisub-panel-btns"></div><div class="bilisub-panel-log"></div>`;
     document.body.appendChild(panelEl);
 
     panelLog = panelEl.querySelector('.bilisub-panel-log');
@@ -368,6 +438,6 @@
     panelVisible = true;
   }
 
-  function hidePanel() { if (panelEl) { panelEl.remove(); panelEl = null; panelLog = null; panelBtn = null; panelVisible = false; } }
+  function hidePanel() { if (panelEl) { panelEl.remove(); panelEl = null; panelLog = null; panelBtn = null; panelVideoList = []; panelVisible = false; } }
   function togglePanel() { panelVisible ? hidePanel() : createPanel(); }
 })();
