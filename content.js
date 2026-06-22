@@ -218,6 +218,10 @@
             sendResponse({ videos });
             break;
           }
+          case 'togglePanel':
+            togglePanel();
+            sendResponse({ ok: true });
+            break;
           default:
             sendResponse({ error: 'Unknown action' });
         }
@@ -227,4 +231,143 @@
     })();
     return true; // keep channel open for async
   });
+
+  // ═══ Floating Panel UI ═══
+  let panelVisible = false, panelEl = null, panelLog = null, panelBtn = null;
+
+  function detectPageType() {
+    const url = location.href;
+    if (/\/video\/(BV[a-zA-Z0-9]+)/.test(url)) {
+      const bv = RegExp.$1, p = url.match(/[?&]p=(\d+)/);
+      return { type: 'video', label: p ? '选集 · P' + p[1] : '视频页', bvid: bv, allPages: !!p };
+    }
+    if (/\/lists?\/(\d+)/.test(url)) return { type: 'collection', label: '合集页', listId: RegExp.$1 };
+    if (/[?&]fid=(\d+)/.test(url) && url.includes('favlist')) return { type: 'fav', label: '收藏夹', fid: RegExp.$1 };
+    if (/space\.bilibili\.com\/(\d+)/.test(url) && !url.includes('/lists/') && !url.includes('favlist'))
+      return { type: 'space', label: '个人主页', mid: RegExp.$1 };
+    return { type: 'unknown', label: '不支持' };
+  }
+
+  function plog(msg, cls) {
+    if (!panelLog) return;
+    const el = document.createElement('div');
+    el.style.cssText = `color:${cls==='ok'?'#4caf50':cls==='fail'?'#f44336':'#aaa'};font-size:11px;line-height:1.8`;
+    el.textContent = msg;
+    panelLog.appendChild(el);
+    panelLog.scrollTop = panelLog.scrollHeight;
+  }
+
+  async function panelDownloadSingle(bvid, allPages) {
+    panelBtn.disabled = true; panelBtn.innerHTML = '<span class="bilisub-spin"></span> 提取中...'; panelLog.innerHTML = '';
+    try {
+      if (allPages) {
+        const v = await (await fetch(`https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`, { credentials: 'include' })).json();
+        if (v.code !== 0) { plog(v.message, 'fail'); return; }
+        const pages = v.data.pages || [v.data];
+        plog(`共 ${pages.length} 个选集`, 'ok');
+        for (const p of pages) {
+          try {
+            const r = await extractSubtitle(bvid, p.cid);
+            const n = (p.part || 'P' + p.page).replace(/[\\/:*?"<>|]/g, '_').trim().substring(0, 80);
+            const a = document.createElement('a'); a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(r.txt); a.download = n + '.txt'; a.click();
+            plog(`✓ P${p.page} · ${r.count}条`, 'ok');
+          } catch (e) { plog(`✗ P${p.page} ${e.message}`, 'fail'); }
+        }
+      } else {
+        const r = await extractSubtitle(bvid);
+        const a = document.createElement('a'); a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(r.txt); a.download = r.filename + '.txt'; a.click();
+        plog(`✓ ${r.title.substring(0,30)} · ${r.count}条`, 'ok');
+      }
+    } catch (e) { plog(e.message, 'fail'); }
+    panelBtn.disabled = false; panelBtn.innerHTML = '⬇ 下载 AI 字幕';
+  }
+
+  async function panelDownloadBatch(info) {
+    panelBtn.disabled = true; panelLog.innerHTML = '';
+    try {
+      plog('获取列表中...', '');
+      let videos;
+      if (info.type === 'collection') videos = await listCollection(info.listId);
+      else if (info.type === 'fav') videos = await listFavorites(info.fid);
+      else if (info.type === 'space') videos = await listSpace(info.mid, 50);
+      else { plog('不支持', 'fail'); panelBtn.disabled = false; return; }
+      if (!videos?.length) { plog('无视频', 'fail'); panelBtn.disabled = false; return; }
+
+      const total = videos.length;
+      plog(`共 ${total} 个视频，打包 ZIP...`, 'ok');
+      panelBtn.innerHTML = `<span class="bilisub-spin"></span> ${total}个视频...`;
+
+      const zip = new JSZip();
+      let ok = 0;
+      for (const v of videos) {
+        try {
+          const r = await extractSubtitle(v.bvid);
+          if (r.txt) zip.file(r.filename + '.txt', r.txt);
+          ok++;
+        } catch (e) { plog(`✗ ${v.bvid} ${e.message}`, 'fail'); }
+      }
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `BiliSub_${total}videos.zip`; a.click();
+      URL.revokeObjectURL(url);
+      plog(`✓ ZIP · ${ok}/${total}`, 'ok');
+    } catch (e) { plog(e.message, 'fail'); }
+    panelBtn.disabled = false; panelBtn.innerHTML = '⬇ 批量下载字幕';
+  }
+
+  function buildPanelButtons(info) {
+    const btns = panelEl.querySelector('.bilisub-panel-btns');
+    btns.innerHTML = '';
+    const mkBtn = (text, cls, fn) => {
+      const b = document.createElement('button'); b.className = 'bilisub-panel-btn ' + cls; b.textContent = text; b.onclick = fn; btns.appendChild(b); return b;
+    };
+    if (info.type === 'video') {
+      panelBtn = mkBtn('⬇ 下载当前视频字幕', 'bilisub-panel-primary', () => panelDownloadSingle(info.bvid, false));
+      mkBtn('⬇ 下载全部选集字幕', 'bilisub-panel-batch', () => panelDownloadSingle(info.bvid, true));
+    } else if (['collection', 'fav', 'space'].includes(info.type)) {
+      panelBtn = mkBtn('⬇ 批量下载字幕 (ZIP)', 'bilisub-panel-batch', () => panelDownloadBatch(info));
+    } else {
+      btns.innerHTML = '<div style="color:#888;font-size:12px;padding:8px">请在视频/合集/收藏夹/主页使用</div>';
+    }
+  }
+
+  function createPanel() {
+    if (panelEl) return;
+    const style = document.createElement('style');
+    style.textContent = `
+      .bilisub-panel{position:fixed;top:80px;right:16px;z-index:99999;width:300px;background:#1a1a2e;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);font-family:system-ui,sans-serif;overflow:hidden;animation:bilisub-fadeIn .25s ease}
+      .bilisub-panel-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px}
+      .bilisub-panel-logo{font-size:16px;font-weight:700;color:#00a1d6}.bilisub-panel-logo span{color:#ff6699}
+      .bilisub-panel-close{background:none;border:none;color:#888;font-size:18px;cursor:pointer;padding:0 4px;line-height:1}.bilisub-panel-close:hover{color:#fff}
+      .bilisub-panel-tag{display:inline-block;padding:3px 8px;border-radius:4px;font-size:11px;margin:0 14px 4px}
+      .bilisub-panel-btns{padding:8px 14px;display:flex;flex-direction:column;gap:6px}
+      .bilisub-panel-btn{display:flex;align-items:center;justify-content:center;width:100%;padding:9px;border:none;border-radius:7px;font-size:12px;cursor:pointer;transition:all .2s}
+      .bilisub-panel-primary{background:#00a1d6;color:#fff}.bilisub-panel-primary:hover{background:#00b5e5}
+      .bilisub-panel-batch{background:#ff6699;color:#fff}.bilisub-panel-batch:hover{background:#ff7aa8}
+      .bilisub-panel-btn:disabled{opacity:.5;cursor:not-allowed}
+      .bilisub-panel-log{max-height:180px;overflow-y:auto;padding:4px 14px 10px}
+      .bilisub-spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:bilisub-s .8s linear infinite}
+      @keyframes bilisub-s{to{transform:rotate(360deg)}}
+      @keyframes bilisub-fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+    `;
+    document.head.appendChild(style);
+
+    const info = detectPageType();
+    const colors = { video: '#4caf50', collection: '#ff9800', fav: '#e91e63', space: '#2196f3', unknown: '#888' };
+    const bgs = { video: '#0d3320', collection: '#331a0d', fav: '#330d2e', space: '#0d1a33', unknown: '#222' };
+
+    panelEl = document.createElement('div');
+    panelEl.className = 'bilisub-panel';
+    panelEl.innerHTML = `<div class="bilisub-panel-header"><div class="bilisub-panel-logo">Bili<span>Sub</span></div><button class="bilisub-panel-close" title="关闭">✕</button></div><div class="bilisub-panel-tag" style="background:${bgs[info.type]};color:${colors[info.type]}">${info.label}</div><div class="bilisub-panel-btns"></div><div class="bilisub-panel-log"></div>`;
+    document.body.appendChild(panelEl);
+
+    panelLog = panelEl.querySelector('.bilisub-panel-log');
+    panelEl.querySelector('.bilisub-panel-close').onclick = hidePanel;
+    buildPanelButtons(info);
+    panelVisible = true;
+  }
+
+  function hidePanel() { if (panelEl) { panelEl.remove(); panelEl = null; panelLog = null; panelBtn = null; panelVisible = false; } }
+  function togglePanel() { panelVisible ? hidePanel() : createPanel(); }
 })();
