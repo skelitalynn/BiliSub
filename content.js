@@ -172,13 +172,13 @@
     const all = [];
     const fp = getFpParams();
     for (let p = 1; p <= Math.ceil(limit / 50); p++) {
-      const rawParams = { mid, ps: '50', pn: String(p), order: 'pubdate', tid: '0', keyword: '', platform: 'web', web_location: '1550101', ...fp };
+      const rawParams = { mid, ps: '50', pn: String(p), order: 'pubdate', tid: '0', keyword: '', platform: 'web', web_location: '333.1387', special_type: '', index: '0', ...fp };
       const params = await signWbi(rawParams);
       const d = await (await fetch(
         `https://api.bilibili.com/x/space/wbi/arc/search?${new URLSearchParams(params)}`,
         {
           credentials: 'include',
-          headers: { 'Referer': `https://space.bilibili.com/${mid}`, 'Origin': 'https://space.bilibili.com' }
+          headers: { 'Origin': 'https://space.bilibili.com' }
         }
       )).json();
       if (d.code !== 0) throw new Error(`Space API: ${d.message} (code=${d.code})`);
