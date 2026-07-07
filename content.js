@@ -140,14 +140,46 @@
     return all;
   }
 
+  // ═══ Device fingerprint params (anti-bot, required since 2024) ═══
+  // Ported from yt-dlp: https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/extractor/bilibili.py
+  function getFpParams() {
+    const rndB64 = (min, max) => {
+      const len = min + Math.floor(Math.random() * (max - min + 1));
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?/~`';
+      let s = '';
+      for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
+      return btoa(s).replace(/=+$/, ''); // strip base64 padding
+    };
+    const wh = () => {
+      const w = screen?.width || 1920, h = screen?.height || 1080;
+      const r = Math.floor(Math.random() * 114);
+      return [2 * w + 2 * h + 3 * r, 4 * w - h + r, r];
+    };
+    const of = () => {
+      const r = Math.floor(Math.random() * 514);
+      return [30 + 20 + r, 40 - 40 + 2 * r, r];
+    };
+    return {
+      dm_img_list: '[]',
+      dm_img_str: rndB64(16, 64),
+      dm_cover_img_str: rndB64(32, 128),
+      dm_img_inter: JSON.stringify({ ds: [], wh: wh(), of: of() }),
+    };
+  }
+
   // ═══ List: Space page ═══
   async function listSpace(mid, limit = 50) {
     const all = [];
+    const fp = getFpParams();
     for (let p = 1; p <= Math.ceil(limit / 50); p++) {
-      const params = await signWbi({ mid, ps: '50', pn: String(p), order: 'pubdate', tid: '0', keyword: '', platform: 'web' });
+      const rawParams = { mid, ps: '50', pn: String(p), order: 'pubdate', tid: '0', keyword: '', platform: 'web', web_location: '1550101', ...fp };
+      const params = await signWbi(rawParams);
       const d = await (await fetch(
         `https://api.bilibili.com/x/space/wbi/arc/search?${new URLSearchParams(params)}`,
-        { credentials: 'include' }
+        {
+          credentials: 'include',
+          headers: { 'Referer': `https://space.bilibili.com/${mid}`, 'Origin': 'https://space.bilibili.com' }
+        }
       )).json();
       if (d.code !== 0) throw new Error(`Space API: ${d.message} (code=${d.code})`);
       const vlist = d.data?.list?.vlist || [];
