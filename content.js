@@ -4,6 +4,10 @@
 (function () {
   'use strict';
 
+  // Guard: prevent double-injection from chrome.scripting.executeScript
+  if (window.__BILISUB_LOADED__) return;
+  window.__BILISUB_LOADED__ = true;
+
   // ═══ WBI Signing ═══
   const MIXIN = [
     46,47,18,2,53,8,23,32,15,50,10,31,58,3,45,35,27,43,5,49,33,9,42,19,29,28,14,37,12,52,56,7,
@@ -140,11 +144,12 @@
   async function listSpace(mid, limit = 50) {
     const all = [];
     for (let p = 1; p <= Math.ceil(limit / 50); p++) {
+      const params = await signWbi({ mid, ps: '50', pn: String(p), order: 'pubdate', tid: '0', keyword: '', platform: 'web' });
       const d = await (await fetch(
-        `https://api.bilibili.com/x/space/wbi/arc/search?mid=${mid}&ps=50&pn=${p}&order=pubdate`,
+        `https://api.bilibili.com/x/space/wbi/arc/search?${new URLSearchParams(params)}`,
         { credentials: 'include' }
       )).json();
-      if (d.code !== 0) break;
+      if (d.code !== 0) throw new Error(`Space API: ${d.message} (code=${d.code})`);
       const vlist = d.data?.list?.vlist || [];
       for (const v of vlist) all.push({ bvid: v.bvid, title: v.title });
       if (all.length >= limit || vlist.length < 50) break;
@@ -462,12 +467,12 @@
   function togglePanel() { panelVisible ? hidePanel() : createPanel(); }
 
   // ═══ SPA navigation watcher — auto-refresh panel when URL changes ═══
-  let _lastUrl = location.href;
-  setInterval(() => {
-    if (!panelVisible || location.href === _lastUrl) return;
-    _lastUrl = location.href;
+  function onUrlChange() {
+    if (!panelVisible) return;
     const info = detectPageType();
+    if (!panelEl) return;
     const tag = panelEl.querySelector('.bilisub-panel-tag');
+    if (!tag) return;
     const colors = { video: '#2e7d32', collection: '#e65100', fav: '#c62828', space: '#1565c0', unknown: '#666' };
     const bgs = { video: '#e8f5e9', collection: '#fff3e0', fav: '#fce4ec', space: '#e3f2fd', unknown: '#f5f5f5' };
     tag.textContent = info.label;
@@ -475,5 +480,20 @@
     tag.style.color = colors[info.type];
     panelVideoList = [];
     buildPanelButtons(info);
-  }, 800);
+  }
+
+  // Monkey-patch history.pushState / replaceState to catch SPA navigations
+  const _pushState = history.pushState;
+  const _replaceState = history.replaceState;
+  history.pushState = function () { _pushState.apply(this, arguments); onUrlChange(); };
+  history.replaceState = function () { _replaceState.apply(this, arguments); onUrlChange(); };
+  window.addEventListener('popstate', onUrlChange);
+
+  // Fallback polling for URL changes not captured by pushState (e.g., hash-only)
+  let _lastUrl = location.href;
+  setInterval(() => {
+    if (location.href === _lastUrl) return;
+    _lastUrl = location.href;
+    onUrlChange();
+  }, 1500);
 })();
