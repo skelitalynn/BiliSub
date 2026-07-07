@@ -244,7 +244,7 @@
     if (/\/lists?\/(\d+)/.test(url)) return { type: 'collection', label: '合集页', listId: RegExp.$1 };
     if (/[?&]fid=(\d+)/.test(url) && url.includes('favlist')) return { type: 'fav', label: '收藏夹', fid: RegExp.$1 };
     if (/space\.bilibili\.com\/(\d+)/.test(url) && !url.includes('/lists/') && !url.includes('favlist'))
-      return { type: 'space', label: '个人主页', mid: RegExp.$1 };
+      return { type: 'space', label: url.includes('/upload') ? '投稿页' : '个人主页', mid: RegExp.$1 };
     return { type: 'unknown', label: '不支持' };
   }
 
@@ -460,4 +460,20 @@
 
   function hidePanel() { if (panelEl) { panelEl.remove(); panelEl = null; panelLog = null; panelBtn = null; panelVideoList = []; panelVisible = false; } }
   function togglePanel() { panelVisible ? hidePanel() : createPanel(); }
+
+  // ═══ SPA navigation watcher — auto-refresh panel when URL changes ═══
+  let _lastUrl = location.href;
+  setInterval(() => {
+    if (!panelVisible || location.href === _lastUrl) return;
+    _lastUrl = location.href;
+    const info = detectPageType();
+    const tag = panelEl.querySelector('.bilisub-panel-tag');
+    const colors = { video: '#2e7d32', collection: '#e65100', fav: '#c62828', space: '#1565c0', unknown: '#666' };
+    const bgs = { video: '#e8f5e9', collection: '#fff3e0', fav: '#fce4ec', space: '#e3f2fd', unknown: '#f5f5f5' };
+    tag.textContent = info.label;
+    tag.style.background = bgs[info.type];
+    tag.style.color = colors[info.type];
+    panelVideoList = [];
+    buildPanelButtons(info);
+  }, 800);
 })();
