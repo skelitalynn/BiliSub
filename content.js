@@ -172,7 +172,7 @@
     const all = [];
     const fp = getFpParams();
     for (let p = 1; p <= Math.ceil(limit / 50); p++) {
-      const rawParams = { mid, ps: '50', pn: String(p), order: 'pubdate', tid: '0', keyword: '', platform: 'web', web_location: '333.1387', special_type: '', index: '0', ...fp };
+      const rawParams = { mid, ps: '50', pn: String(p), order: 'pubdate', tid: '0', keyword: '', platform: 'web', web_location: '1550101', ...fp };
       const params = await signWbi(rawParams);
       const d = await (await fetch(
         `https://api.bilibili.com/x/space/wbi/arc/search?${new URLSearchParams(params)}`,
@@ -195,22 +195,29 @@
     const links = document.querySelectorAll('a[href*="/video/BV"]');
     if (!links.length) return [];
     const seen = new Set();
-    const videos = [];
+    const bvids = [];
     for (const a of links) {
       const m = a.href.match(/\/video\/(BV[a-zA-Z0-9]+)/);
       if (!m || seen.has(m[1])) continue;
       seen.add(m[1]);
-      // Try to get title from nearby elements
-      let title = a.getAttribute('title') || a.textContent?.trim() || '';
-      if (!title || title.length < 2) {
-        // Look for a parent card/row with a title element
-        const card = a.closest('[class*="card"], [class*="item"], [class*="row"], [class*="list"]');
-        if (card) {
-          const titleEl = card.querySelector('[class*="title"], [title], h3, h4, .name');
-          if (titleEl) title = titleEl.getAttribute('title') || titleEl.textContent?.trim() || '';
-        }
-      }
-      videos.push({ bvid: m[1], title: title || m[1] });
+      bvids.push(m[1]);
+    }
+
+    // Use view API to get real titles (batch of 5 concurrent to avoid rate limit)
+    const videos = [];
+    for (let i = 0; i < bvids.length; i += 5) {
+      const batch = bvids.slice(i, i + 5);
+      const results = await Promise.all(batch.map(async (bvid) => {
+        try {
+          const v = await (await fetch(
+            `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`,
+            { credentials: 'include' }
+          )).json();
+          if (v.code === 0) return { bvid, title: v.data.title };
+        } catch (e) { /* skip */ }
+        return { bvid, title: bvid };
+      }));
+      videos.push(...results);
     }
     return videos;
   }
