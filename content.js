@@ -189,6 +189,32 @@
     return all.slice(0, limit);
   }
 
+  // ═══ List: DOM scraping fallback for upload page ═══
+  async function listSpaceFromDom() {
+    // Extract unique BV IDs from all video links on the page
+    const links = document.querySelectorAll('a[href*="/video/BV"]');
+    if (!links.length) return [];
+    const seen = new Set();
+    const videos = [];
+    for (const a of links) {
+      const m = a.href.match(/\/video\/(BV[a-zA-Z0-9]+)/);
+      if (!m || seen.has(m[1])) continue;
+      seen.add(m[1]);
+      // Try to get title from nearby elements
+      let title = a.getAttribute('title') || a.textContent?.trim() || '';
+      if (!title || title.length < 2) {
+        // Look for a parent card/row with a title element
+        const card = a.closest('[class*="card"], [class*="item"], [class*="row"], [class*="list"]');
+        if (card) {
+          const titleEl = card.querySelector('[class*="title"], [title], h3, h4, .name');
+          if (titleEl) title = titleEl.getAttribute('title') || titleEl.textContent?.trim() || '';
+        }
+      }
+      videos.push({ bvid: m[1], title: title || m[1] });
+    }
+    return videos;
+  }
+
   // ═══ Message handler ═══
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     (async () => {
@@ -394,7 +420,22 @@
       let videos;
       if (info.type === 'collection') videos = await listCollection(info.listId);
       else if (info.type === 'fav') videos = await listFavorites(info.fid);
-      else if (info.type === 'space') videos = await listSpace(info.mid, 50);
+      else if (info.type === 'space') {
+        try {
+          videos = await listSpace(info.mid, 50);
+        } catch (apiErr) {
+          if (String(apiErr.message).includes('403') || String(apiErr.message).includes('412')) {
+            plog(`API 不可用 (${apiErr.message})，尝试从页面提取...`, '');
+            videos = await listSpaceFromDom();
+            if (videos?.length) {
+              plog(`⚠️ 从当前页面提取到 ${videos.length} 个视频（仅本页可见部分）`, '');
+              plog('💡 如果视频不全，可在个人主页而非投稿管理页使用', '');
+            }
+          } else {
+            throw apiErr;
+          }
+        }
+      }
       else { plog('不支持', 'fail'); return; }
 
       if (!videos?.length) { plog('未找到视频', 'fail'); btns.innerHTML = ''; return; }
