@@ -70,12 +70,36 @@
     return title.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim().substring(0, 80);
   }
 
+  // 新文件名格式: 【UP主】—标题—【日期】-语言.txt
+  function buildFilename({ ownerName, title, pubdate, lan }) {
+    const langMap = {
+      'ai-zh': '中文', 'zh-CN': '中文', 'zh-Hans': '中文',
+      'zh-Hant': '中文（繁体）', 'zh-HK': '中文（粤语）',
+      'en': '英文', 'ja': '日文', 'ko': '韩文',
+    };
+    const safe = (s) => (s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
+    const lang = langMap[lan] || lan || '字幕';
+
+    let parts = [];
+    if (ownerName) parts.push(`【${safe(ownerName)}】`);
+    if (title) parts.push(`—${safe(title)}—`);
+    if (pubdate) {
+      const d = new Date(pubdate * 1000);
+      const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      parts.push(`【${ds}】`);
+    }
+    parts.push(`-${lang}`);
+    return parts.join('').substring(0, 200);
+  }
+
   // ═══ Core: Extract subtitle for a single BV ═══
   async function extractSubtitle(bvid, cidOverride) {
     const view = await (await fetch(`https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`, { credentials: 'include' })).json();
     if (view.code !== 0) throw new Error(`View: ${view.message}`);
 
     const title = view.data.title;
+    const ownerName = view.data.owner.name;
+    const pubdate = view.data.pubdate;
     let cid = cidOverride || view.data.cid;
     let aid = view.data.aid;
 
@@ -86,9 +110,9 @@
     const subs = player.data?.subtitle?.subtitles || [];
     if (!subs.length) throw new Error('无字幕');
 
-    let url = null;
-    for (const s of subs) if (s.lan === 'ai-zh') { url = s.subtitle_url; break; }
-    if (!url) url = subs[0].subtitle_url;
+    let url = null, lan = null;
+    for (const s of subs) if (s.lan === 'ai-zh') { url = s.subtitle_url; lan = s.lan; break; }
+    if (!url) { url = subs[0].subtitle_url; lan = subs[0].lan; }
     if (!url) throw new Error('无字幕URL');
     if (url.startsWith('//')) url = 'https:' + url;
 
@@ -102,7 +126,7 @@
       txt,
       count: body.length,
       title,
-      filename: sanitizeFilename(title)
+      filename: buildFilename({ ownerName, title, pubdate, lan })
     };
   }
 
@@ -338,8 +362,8 @@
         for (const p of pages) {
           try {
             const r = await extractSubtitle(bvid, p.cid);
-            const n = (p.part || 'P' + p.page).replace(/[\\/:*?"<>|]/g, '_').trim().substring(0, 80);
-            const a = document.createElement('a'); a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(r.txt); a.download = n + '.txt'; a.click();
+            const suffix = pages.length > 1 ? `_P${p.page}` : '';
+            const a = document.createElement('a'); a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(r.txt); a.download = r.filename + suffix + '.txt'; a.click();
             plog(`✓ P${p.page} · ${r.count}条`, 'ok');
           } catch (e) { plog(`✗ P${p.page} ${e.message}`, 'fail'); }
         }
